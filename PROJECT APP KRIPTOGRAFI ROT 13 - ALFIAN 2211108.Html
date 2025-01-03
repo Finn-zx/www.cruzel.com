@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Kriptografi</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #ffecd2, #fcb69f);
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 600px;
+        }
+        textarea, select, input, button {
+            font-size: 16px;
+            margin: 10px 0;
+            padding: 10px;
+            width: 100%;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        button {
+            background-color: #4CAF50;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="login-container" class="container">
+        <h1>Login</h1>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">Masuk</button>
+        <p>Belum punya akun? <a href="javascript:void(0);" onclick="showRegister()">Registrasi</a></p>
+    </div>
+
+    <div id="register-container" class="container hidden">
+        <h1>Registrasi</h1>
+        <input type="text" id="register-username" placeholder="Username">
+        <input type="password" id="register-password" placeholder="Password">
+        <button onclick="register()">Daftar</button>
+        <p>Sudah punya akun? <a href="javascript:void(0);" onclick="showLogin()">Login</a></p>
+    </div>
+
+    <div id="app-container" class="container hidden">
+        <h1>Aplikasi Kriptografi</h1>
+        <textarea id="input-text" placeholder="Masukkan teks atau unggah file"></textarea>
+        <textarea id="result" readonly placeholder="Hasil enkripsi atau dekripsi"></textarea>
+
+        <select id="encryption-method">
+            <option value="rot13">ROT-13</option>
+            <option value="caesar">Caesar Cipher</option>
+            <option value="vigenere">Vigenere Cipher</option>
+        </select>
+
+        <input type="number" id="caesar-shift" placeholder="Shift Caesar (Default 3)" value="3" min="1" max="25">
+        <input type="text" id="vigenere-key" placeholder="Kunci Vigenere">
+
+        <button onclick="encrypt()">Enkripsi</button>
+        <button onclick="decrypt()">Dekripsi</button>
+        <button onclick="clearFields()">Bersihkan</button>
+        <button onclick="downloadResult()">Unduh Hasil</button>
+
+        <input type="file" id="file-upload" accept=".txt, .docx, .xlsx, .pdf, .pptx">
+        <button onclick="handleFileUpload()">Unggah dan Baca File</button>
+        <button onclick="logout()">Logout</button>
+    </div>
+
+    <script>
+        // Load users from localStorage on page load
+        let users = JSON.parse(localStorage.getItem('users')) || [];
+        let loggedInUser = null;
+
+        function showRegister() {
+            document.getElementById("login-container").classList.add("hidden");
+            document.getElementById("register-container").classList.remove("hidden");
+        }
+
+        function showLogin() {
+            document.getElementById("register-container").classList.add("hidden");
+            document.getElementById("login-container").classList.remove("hidden");
+        }
+
+        function login() {
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+            const user = users.find(u => u.username === username && u.password === password);
+
+            if (user) {
+                loggedInUser = user;
+                document.getElementById("login-container").classList.add("hidden");
+                document.getElementById("app-container").classList.remove("hidden");
+                clearFields();
+            } else {
+                alert("Username atau password salah.");
+            }
+        }
+
+        function register() {
+            const username = document.getElementById("register-username").value;
+            const password = document.getElementById("register-password").value;
+
+            if (users.find(u => u.username === username)) {
+                alert("Username sudah terdaftar.");
+                return;
+            }
+
+            // Add the new user to the users array and save to localStorage
+            users.push({ username, password });
+            localStorage.setItem('users', JSON.stringify(users));  // Save to localStorage
+            alert("Registrasi berhasil. Silakan login.");
+            showLogin();
+        }
+
+        function logout() {
+            loggedInUser = null;
+            document.getElementById("app-container").classList.add("hidden");
+            document.getElementById("login-container").classList.remove("hidden");
+            clearFields();
+        }
+
+        function clearFields() {
+            document.getElementById("input-text").value = '';
+            document.getElementById("result").value = '';
+            document.getElementById('file-upload').value = '';
+        }
+
+        // Add your existing encryption and decryption functions below
+        function caesarCipher(str, shift) {
+            return str.split('').map(char => {
+                if (/[a-zA-Z]/.test(char)) {
+                    const code = char.charCodeAt(0);
+                    const base = (code >= 97) ? 97 : 65;
+                    return String.fromCharCode((code - base + shift) % 26 + base);
+                }
+                return char;
+            }).join('');
+        }
+
+        function rot13(str) {
+            return str.split('').map(char => {
+                if (/[a-zA-Z]/.test(char)) {
+                    const code = char.charCodeAt(0);
+                    const base = (code >= 97) ? 97 : 65;
+                    return String.fromCharCode((code - base + 13) % 26 + base);
+                }
+                return char;
+            }).join('');
+        }
+
+        function vigenereCipher(text, key) {
+            let result = '';
+            let keyIndex = 0;
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                if (/[a-zA-Z]/.test(char)) {
+                    const base = char.charCodeAt(0) >= 97 ? 97 : 65;
+                    const keyChar = key[keyIndex % key.length];
+                    const keyCode = keyChar.toUpperCase().charCodeAt(0) - 65;
+                    const newChar = String.fromCharCode(((char.charCodeAt(0) - base + keyCode) % 26) + base);
+                    result += newChar;
+                    keyIndex++;
+                } else {
+                    result += char;
+                }
+            }
+            return result;
+        }
+
+        function vigenereDecipher(text, key) {
+            let result = '';
+            let keyIndex = 0;
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                if (/[a-zA-Z]/.test(char)) {
+                    const base = char.charCodeAt(0) >= 97 ? 97 : 65;
+                    const keyChar = key[keyIndex % key.length];
+                    const keyCode = keyChar.toUpperCase().charCodeAt(0) - 65;
+                    const newChar = String.fromCharCode(((char.charCodeAt(0) - base - keyCode + 26) % 26) + base);
+                    result += newChar;
+                    keyIndex++;
+                } else {
+                    result += char;
+                }
+            }
+            return result;
+        }
+
+        function encrypt() {
+            const method = document.getElementById('encryption-method').value;
+            let text = document.getElementById("input-text").value;
+
+            if (method === "caesar") {
+                const shift = parseInt(document.getElementById("caesar-shift").value) || 3;
+                text = caesarCipher(text, shift);
+            } else if (method === "rot13") { 
+                text = rot13(text);
+            } else if (method === "vigenere") { 
+                text = vigenereCipher(text, document.getElementById('vigenere-key').value);
+            }
+
+            document.getElementById("result").value = text;
+        }
+
+        function decrypt() {
+            const method = document.getElementById('encryption-method').value;
+            let text = document.getElementById("input-text").value;
+
+            if (!text) {
+                alert("Tidak ada teks untuk didekripsi.");
+                return;
+            }
+
+            if (method === "caesar") {
+                const shift = parseInt(document.getElementById("caesar-shift").value) || 3;
+                text = caesarCipher(text, 26 - shift);
+            } else if (method === "rot13") {
+                text = rot13(text);
+            } else if (method === "vigenere") {
+                text = vigenereDecipher(text, document.getElementById('vigenere-key').value);
+            }
+
+            document.getElementById("result").value = text;
+        }
+
+        function downloadResult() {
+            const text = document.getElementById("result").value;
+            const blob = new Blob([text], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = "result.txt";
+            link.click();
+        }
+
+        async function handleFileUpload() {
+            const fileInput = document.getElementById('file-upload');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert("Pilih file terlebih dahulu.");
+                return;
+            }
+
+            const reader = new FileReader();
+            const fileExtension = file.name.split('.').pop().toLowerCase();
+
+            reader.onload = async (e) => {
+                const content = e.target.result;
+                let fileContent = "";
+
+                if (fileExtension === "txt") {
+                    fileContent = content;
+                } else if (fileExtension === "docx") {
+                    fileContent = await extractDocxText(content);
+                } else if (fileExtension === "xlsx") {
+                    const result = await extractXlsxText(content);
+                    fileContent = result.text;
+                } else if (fileExtension === "pdf") {
+                    fileContent = await extractPdfText(content);
+                } else if (fileExtension === "pptx") {
+                    fileContent = await extractPptxText(content);
+                } else {
+                    alert("Format file tidak didukung.");
+                    return;
+                }
+
+                document.getElementById("input-text").value = fileContent;
+            };
+
+            if (fileExtension === "xlsx") {
+                reader.readAsArrayBuffer(file);
+            } else if (fileExtension === "pdf" || fileExtension === "docx" || fileExtension === "pptx") {
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.readAsText(file);
+            }
+        }
+
+        async function extractDocxText(content) {
+            const result = await mammoth.convertToHtml({arrayBuffer: content});
+            return result.value;
+        }
+
+        async function extractXlsxText(content) {
+            const workbook = XLSX.read(content, { type: 'array' });
+            let result = '';
+            workbook.SheetNames.forEach(sheetName => {
+                const worksheet = workbook.Sheets[sheetName];
+                result += `Sheet: ${sheetName}\n`;
+                result += XLSX.utils.sheet_to_csv(worksheet) + '\n\n';
+            });
+            return { text: result.trim() };
+        }
+
+        async function extractPdfText(content) {
+            const pdf = await pdfjsLib.getDocument({ data: content }).promise;
+            let pdfText = "";
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                pdfText += textContent.items.map(item => item.str).join(" ") + "\n";
+            }
+            return pdfText.trim();
+        }
+
+        async function extractPptxText(content) {
+            const zip = new JSZip();
+            const pptx = await zip.loadAsync(content);
+            let text = '';
+            const slides = pptx.folder('ppt/slides');
+            for (let slideName in slides.files) {
+                const slideFile = slides.files[slideName];
+                const slideContent = await slideFile.async('text');
+                text += slideContent + '\n';
+            }
+            return text.trim();
+        }
+    </script>
+</body>
+</html>
